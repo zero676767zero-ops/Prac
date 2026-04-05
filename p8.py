@@ -1,25 +1,34 @@
+# Pin : vcc -> pin 1, gnd -> pin 6, DO -> Pin 11(GPIO 17)
+# Led : + long leg terminal -> Pin 12(GPIO 18) , -ve short leg -> Pin 14(Gnd)
 
-HelloController
-[HttpGet("{name}")]
-public string GetHello(string name)
-{
-    return $"Hello {name} from .Net";
-}
+import RPi.GPIO as GPIO
+from time import sleep 
 
-py file
-import request, urllib3
+FLAME_DO = 17
+ALERT = 18
 
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+GPIO.setmode(GPIO.BCM)
 
-name = input("Enter your name: ")
-url = f"https://xxxx/Hello/{name}"
+GPIO.setup(FLAME_DO, GPIO.IN)
+GPIO.setup(ALERT, GPIO.OUT)
 
-resp = requests.get(url, verify = False)
+GPIO.output(ALERT, False)
+print("Flame Sensor Ready....")
 
-if resp.status_code == 200:
-    print(resp.text)
-else:
-    print(f"Error : {resp.status_code}")
-
-
+try:
+    while True:
+        value = GPIO.input(FLAME_DO)
+        print("Sensor Output(DO) =", value)
+        # 0 means flame detected
+        if value == 0:
+            GPIO.output(ALERT, True)
+            print("Flame Detected, ALERT ON!!!")
+        else:
+            GPIO.output(ALERT, False)
+            print("No Flame Detected, ALERT OFF!!!")
+        sleep(0.5)
+except KeyboardInterrupt:
+    print("Some Error Occurred")
+finally:
+    GPIO.cleanup()
 
