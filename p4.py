@@ -1,59 +1,97 @@
-# sudo apt install python3-pip
-# pip3 install telepot 
-
-import telepot
-from telepot.loop import MessageLoop
-from datetime import datetime
-from time import sleep
-import RPi.GPIO as GPIO
-
-red = 22
-yellow = 23
-
-GPIO.setmode(GPIO.BCM)
-GPIO.setwarnings(False)
-
-GPIO.setup(red, GPIO.OUT)
-GPIO.output(red, 0)
-
-GPIO.setup(yellow, GPIO.OUT)
-GPIO.output(yellow, 0)
-
-def action(msg):
-    chat_id = msg["chat"]["id"]
-    command = msg["text"]
-    print("Received: " + command)
-    if "on" in command.casefold():
-        message = "on "
-        if "red" in command.casefold():
-            message += "red"
-            GPIO.output(red, 1)
-        elif "yellow" in command.casefold():
-            message += "yellow"
-            GPIO.output(yellow, 1)
-        message += " light"
-        telegram_bot.sendMessage(chat_id, message)
-    
-    if "off" in command.casefold():
-        message = "off "
-        if "red" in command.casefold():
-            message += "red"
-            GPIO.output(red, 0)
-        elif "yellow" in command.casefold():
-            message += "yellow"
-            GPIO.output(yellow, 0)
-        message += " light"
-        telegram_bot.sendMessage(chat_id, message)
-
-telegram_bot = telepot.Bot("")
-print(telegram_bot.getMe())
-MessageLoop(telegram_bot, action).run_as_thread()
+# BIGRAM
+def generate_bigrams(text):
+    bigrams = []
+    for i in range(len(text) - 1):
+        bigrams.append(text[i:i+2])   # cleaner slicing
+    return bigrams
 
 
-try:
-    while True:
-        sleep(10)
-finally:
-    GPIO.output(red, 0)
-    GPIO.output(yellow, 0)
-    GPIO.cleanup()
+def calculate_jaccard(set1, set2):
+    union = set1 | set2
+    intersection = set1 & set2
+    return union, intersection
+
+
+# Input
+string1 = "hello"
+string2 = "yellow"
+
+bigrams1 = generate_bigrams(string1)
+bigrams2 = generate_bigrams(string2)
+
+print("Bigrams of string1:", bigrams1)
+print("Bigrams of string2:", bigrams2)
+
+union, intersection = calculate_jaccard(set(bigrams1), set(bigrams2))
+
+print("Union:", union)
+print("Intersection:", intersection)
+
+similarity = len(intersection) / len(union)
+print(f"Bigram Jaccard Similarity: {similarity:.3f}")
+
+print("-"*80)
+
+# 2) TRIGRAM
+def generate_trigrams(text):
+    trigrams = []
+    for i in range(len(text) - 2):
+        trigrams.append(text[i:i+3])
+    return trigrams
+
+
+# Input
+string1 = "hello"
+string2 = "yellow"
+
+trigrams1 = generate_trigrams(string1)
+trigrams2 = generate_trigrams(string2)
+
+print("Trigrams of string1:", trigrams1)
+print("Trigrams of string2:", trigrams2)
+
+union = set(trigrams1) | set(trigrams2)
+intersection = set(trigrams1) & set(trigrams2)
+
+print("Union:", union)
+print("Intersection:", intersection)
+
+similarity = len(intersection) / len(union)
+print(f"Trigram Jaccard Similarity: {similarity:.3f}")
+
+print("-"*80)
+# Jaccard Coefficent for n-grams
+def generate_ngrams(text, n):
+    if not isinstance(text, str) or len(text) < n:
+        return []
+    return [text[i:i+n] for i in range(len(text) - n + 1)]
+
+
+def jaccard_similarity(text1, text2, n):
+    ngrams1 = generate_ngrams(text1.lower(), n)
+    ngrams2 = generate_ngrams(text2.lower(), n)
+
+    set1 = set(ngrams1)
+    set2 = set(ngrams2)
+
+    intersection = set1 & set2
+    union = set1 | set2
+
+    print(f"{n}-grams of text1:", ngrams1)
+    print(f"{n}-grams of text2:", ngrams2)
+    print("Intersection:", intersection)
+    print("Union:", union)
+
+    if len(union) == 0:
+        return 0.0
+
+    return len(intersection) / len(union)
+
+
+# Example
+string1 = "hello"
+string2 = "yellow"
+n = 3
+
+similarity_score = jaccard_similarity(string1, string2, n)
+print(f"Jaccard Similarity ({n}-gram): {similarity_score:.3f}")

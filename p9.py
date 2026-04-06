@@ -1,82 +1,208 @@
-# Matrix - vcc -> Pin 1 (3.3V), gnd -> Pin 6, DIN -> Pin 19(MOSI (GPIO 10)), CS/LOAD -> Pin 24(GPIO 8), Clk -> Pin 23(GPIO 11)
+# 1)Retrieve the indexed document no based on the query
 
-# sudo apt update
-# sudo apt install -y python3-pip
-# pip3 install luma.led_matrix
+import string
+from collections import defaultdict
+
+# Preprocessing function
+def preprocess_text(text):
+    text = text.lower()
+    text = text.translate(str.maketrans("", "", string.punctuation))
+    return text.split()
 
 
-from luma.core.interface.serial import spi, noop
-from luma.led_matrix.device import max7219
-from luma.core.render import canvas
-from luma.core.legacy import show_message, text
-from luma.core.legacy.font import proportional, CP437_FONT
-import time
+# Build inverted index
+def build_inverted_index(documents):
+    inverted_index = defaultdict(set)
 
-# Uses /dev/spidev0.0 (SPI0 CE0)
-serial = spi(port=0, device=0, gpio=noop())
+    for doc_id, text in documents.items():
+        words = preprocess_text(text)
 
-# For a single 8x8 matrix
-device = max7219(serial, cascaded=1, block_orientation=90, rotate=0)
-device.contrast(50)   # 0-255 (increase if needed)
+        for word in words:
+            inverted_index[word].add(doc_id)
 
-print("MAX7219 8x8 Matrix Ready...")
+    return inverted_index
 
-def blink_dot():
-    with canvas(device) as draw:
-        draw.point((3,3), fill="white")
-        draw.point((4,3), fill="white")
-        draw.point((4,4), fill="white")
-        draw.point((3,4), fill="white")
 
-def diagonal_line():
-    with canvas(device) as draw:
-        for i in range(8):
-            draw.point((i, i), fill="white")
+# Search function (AND query)
+def search(inverted_index, query):
+    query_terms = preprocess_text(query)
+    result = None
 
-def border_box():
-    with canvas(device) as draw:
-        for x in range(8):
-            draw.point((x, 0), fill="white")
-            draw.point((x, 7), fill="white")
-        for y in range(8):
-            draw.point((0, y), fill="white")
-            draw.point((7, y), fill="white")
+    for term in query_terms:
+        if term not in inverted_index:
+            return set()
 
-def show_letter_A():
-    with canvas(device) as draw:
-        # Draw a simple 'A'
-        points = [(1,7),(1,6),(1,5),(1,4),(1,3),(1,2),(1,1),(2,0),(3,0),(4,0),(5,0),
-                  (6,1),(6,2),(6,3),(6,4),(6,5),(6,6),(6,7),
-                  (2,7),(2,6),(2,5),(2,4),(2,3),(2,2),(2,1),(3,1),(4,1),(5,1),
-                  (5,2),(5,3),(5,4),(5,5),(5,6),(5,7),(3,4),(4,4)]
-        for p in points:
-            draw.point(p, fill="white")
+        if result is None:
+            result = inverted_index[term]
+        else:
+            result = result.intersection(inverted_index[term])
 
-try:
-    while True:
-        device.clear()
-        blink_dot()
-        time.sleep(1)
+    return result if result else set()
 
-        device.clear()
-        diagonal_line()
-        time.sleep(1)
 
-        device.clear()
-        border_box()
-        time.sleep(1)
+# Documents
+documents = {
+    1: "Information retrieval is an essential aspect of search engines.",
+    2: "The field of information retrieval focuses on algorithms.",
+    3: "Search engines use techniques to improve performance.",
+    4: "Deep learning models are used for information retrieval tasks."
+}
 
-        device.clear()
-        show_letter_A()
-        time.sleep(2)
+# Build index
+index = build_inverted_index(documents)
 
-        device.clear()
-        show_message(device, "RUIA CS-IT", fill="white",
-                     font=proportional(CP437_FONT),
-                     scroll_delay=0.1)
+# Query
+query = "retrieval"
+result = search(index, query)
 
-        time.sleep(1)
+print("Documents containing query:", sorted(result))
 
-except KeyboardInterrupt:
-    device.clear()
-    print("\nStopped. Display cleared.")
+
+
+
+
+
+
+
+
+# 2)Implement an inverted index concept to index
+import nltk
+from nltk.corpus import stopwords   
+
+nltk.download('stopwords')
+
+# Documents
+doc1 = "The quick brown fox jumped over the lazy dog"
+doc2 = "The lazy dog slept in the sun"
+
+# Stopwords
+stop_words = set(stopwords.words('english'))
+
+# Tokenization
+tokens1 = doc1.lower().split()
+tokens2 = doc2.lower().split()
+
+# Unique terms
+terms = sorted(set(tokens1 + tokens2))
+
+# Build inverted index
+inverted_index = {}
+
+for term in terms:
+    if term in stop_words:
+        continue
+
+    postings = []
+
+    if term in tokens1:
+        postings.append(("Document 1", tokens1.count(term)))
+
+    if term in tokens2:
+        postings.append(("Document 2", tokens2.count(term)))
+
+    inverted_index[term] = postings
+
+# Display
+for term in sorted(inverted_index):
+    print(term, "->", inverted_index[term])
+
+
+
+
+
+
+# 3) Display the inverted index in alphabetical order of terms.
+import string
+from collections import defaultdict
+
+def preprocess(text):
+    text = text.lower()
+    text = text.translate(str.maketrans("", "", string.punctuation))
+    return text.split()
+
+def build_index(docs):
+    index = defaultdict(set)
+
+    for doc_id, text in docs.items():
+        for word in preprocess(text):
+            index[word].add(doc_id)
+
+    return index
+
+
+documents = {
+    1: "Information retrieval is important",
+    2: "Search engines use retrieval techniques",
+    3: "Deep learning improves search"
+}
+
+index = build_index(documents)
+
+print("Inverted Index (Alphabetical):")
+for term in sorted(index):
+    print(term, "->", sorted(index[term]))
+
+print("\nTotal unique terms:", len(index))
+
+
+
+
+
+
+
+# 4)Count and display the total number of unique terms indexed.
+import nltk
+from nltk.corpus import stopwords
+
+# Download stopwords
+nltk.download('stopwords')
+
+# Documents
+document1 = "The quick brown fox jumped over the lazy dog"
+document2 = "The lazy dog slept in the sun"
+
+# Stopwords
+stopWords = stopwords.words('english')
+
+# Tokenization
+tokens1 = document1.lower().split()
+tokens2 = document2.lower().split()
+
+# Unique terms
+terms = list(set(tokens1 + tokens2))
+
+# Inverted index and frequency dictionaries
+inverted_index = {}
+occ_num_doc1 = {}
+occ_num_doc2 = {}
+
+# Build inverted index
+for term in terms:
+    if term in stopWords:
+        continue
+
+    documents = []
+
+    if term in tokens1:
+        documents.append("Document 1")
+        occ_num_doc1[term] = tokens1.count(term)
+
+    if term in tokens2:
+        documents.append("Document 2")
+        occ_num_doc2[term] = tokens2.count(term)
+
+    inverted_index[term] = documents
+
+print("\nInverted Index with Term Frequencies (Alphabetical Order):")
+for term in sorted(inverted_index.keys()):
+    print(term, "->", end=" ")
+    for doc in inverted_index[term]:
+        if doc == "Document 1":
+            print(f"{doc} ({occ_num_doc1.get(term, 0)}),", end=" ")
+        else:
+            print(f"{doc} ({occ_num_doc2.get(term, 0)}),", end=" ")
+    print()
+
+print("\nTotal number of unique terms indexed:", len(inverted_index))
+
+
