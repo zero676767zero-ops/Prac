@@ -1,0 +1,212 @@
+
+db.movies.insertMany([
+{ _id: 1, title: "Inception", genre: "Sci-Fi", duration: 148,
+rating: 8.8 },
+{ _id: 2, title: "Jawan", genre: "Action", duration: 165, rating:
+7.9 },
+{ _id: 3, title: "Avatar 2", genre: "Adventure", duration: 192,
+rating: 8.2 }
+])
+
+
+db.theatres.insertMany([
+{ _id: 101, name: "PVR Icon", city: "Mumbai", capacity: 200 },
+{ _id: 102, name: "INOX", city: "Pune", capacity: 150 },
+{ _id: 103, name: "Carnival", city: "Delhi", capacity: 180 }
+])
+
+
+db.shows.insertMany([
+{ _id: 201, movie_id: 1, theatre_id: 101, show_time:
+"2025-11-06T18:00:00", price: 300 },
+{ _id: 202, movie_id: 2, theatre_id: 102, show_time:
+"2025-11-06T21:00:00", price: 250 },
+{ _id: 203, movie_id: 3, theatre_id: 103, show_time:
+"2025-11-06T19:30:00", price: 350 }
+])
+
+
+db.users.insertMany([
+{ _id: 301, name: "Atharva", email: "atharva@gmail.com" },
+{ _id: 302, name: "Sneha", email: "sneha@gmail.com" },
+{ _id: 303, name: "Raj", email: "raj@gmail.com" }
+])
+
+
+db.bookings.insertMany([
+{ booking_id: 401, user_id: 301, show_id: 201, seats: 2,
+total_price: 600 },
+{ booking_id: 402, user_id: 302, show_id: 202, seats: 3,
+total_price: 750 },
+{ booking_id: 403, user_id: 303, show_id: 203, seats: 4,
+total_price: 1400 }
+])
+
+
+db.movies.insert({ title: "Leo", genre: "Action", duration: 160,
+rating: 7.5 })
+
+
+
+db.movies.find().pretty()
+db.movies.find({ genre: "Action" })
+
+
+db.movies.updateOne({ title: "Leo" }, { $set: { rating: 8.0 } })
+
+
+db.movies.deleteOne({ title: "Avatar 2" })
+
+
+3. Analytical Queries
+1 Find the total number of bookings per movie
+db.bookings.aggregate([
+{ $lookup: { from: "shows", localField: "show_id", foreignField:
+"_id", as: "show_info" } },
+{ $unwind: "$show_info" },
+{ $lookup: { from: "movies", localField: "show_info.movie_id",
+foreignField: "_id", as: "movie_info" } },
+{ $unwind: "$movie_info" },
+{ $group: { _id: "$movie_info.title", totalBookings: { $sum: 1 } } }
+])
+
+
+2 Find total revenue earned per theatre
+db.bookings.aggregate([
+{ $lookup: { from: "shows", localField: "show_id", foreignField:
+"_id", as: "show_info" } },
+{ $unwind: "$show_info" },
+{ $lookup: { from: "theatres", localField: "show_info.theatre_id",
+foreignField: "_id", as: "theatre_info" } },
+{ $unwind: "$theatre_info" },
+{ $group: { _id: "$theatre_info.name", totalRevenue: { $sum:
+"$total_price" } } }
+])
+
+
+3 Find the top-rated movies (rating > 8)
+db.movies.find({ rating: { $gt: 8 } }, { _id: 0, title: 1, rating: 1
+})
+
+
+4 Find average ticket price per movie
+db.shows.aggregate([
+{ $lookup: { from: "movies", localField: "movie_id", foreignField:
+"_id", as: "movie_info" } },
+{ $unwind: "$movie_info" },
+{ $group: { _id: "$movie_info.title", avgPrice: { $avg: "$price" } }
+}
+])
+
+
+5 List users who spent more than ₹1000
+db.bookings.aggregate([
+{ $group: { _id: "$user_id", totalSpent: { $sum: "$total_price" } }
+},
+{ $match: { totalSpent: { $gt: 1000 } } },
+{ $lookup: { from: "users", localField: "_id", foreignField: "_id",
+as: "user_info" } },
+{ $unwind: "$user_info" },
+{ $project: { _id: 0, user: "$user_info.name", totalSpent: 1 } }
+])
+
+
+Total and Maximum Theatre Revenue
+//Aggregation pipeline starts on the bookings collection.
+//lookup Performs a join with another collection.
+//localField: "show_id" Field from bookings to match.
+//foreignField: "_id" Field from shows to match with.
+db.bookings.aggregate([
+{
+$lookup: {
+from: "shows",
+localField: "show_id",
+foreignField: "_id",
+as: "show_info"
+}
+},
+{ $unwind: "$show_info" },
+{
+$lookup: {
+from: "theatres",
+localField: "show_info.theatre_id",
+foreignField: "_id",
+as: "theatre_info"
+}
+},
+{ $unwind: "$theatre_info" },
+// Step 1: Calculate total revenue for each theatre
+{
+$group: {
+_id: "$theatre_info.name",
+totalRevenue: { $sum: "$total_price" }
+}
+},
+// Step 2: Sort theatres by revenue (descending)
+{ $sort: { totalRevenue: -1 } },
+// Step 3: Add a field that marks the top one as "Maximum Revenue
+Theatre"
+{
+$group: {
+_id: null,
+allTheatres: { $push: { theatre: "$_id", revenue:
+"$totalRevenue" } },
+maxRevenueTheatre: { $first: { theatre: "$_id", revenue:
+"$totalRevenue" } }
+}
+},
+// Step 4: Final output projection
+{
+$project: {
+_id: 0,
+"All_Theatres_Revenue": "$allTheatres",
+"Theatre_With_Max_Revenue": "$maxRevenueTheatre"
+}
+}
+])
+Total and Maximum Amount Spent by Users
+db.bookings.aggregate([
+// Step 1: Group by user_id to calculate total spending per user
+{
+$group: {
+_id: "$user_id",
+totalSpent: { $sum: "$total_price" }
+}
+},
+// Step 2: Join with 'users' collection to get user names
+{
+$lookup: {
+from: "users",
+localField: "_id",
+foreignField: "_id",
+as: "user_info"
+}
+},
+{ $unwind: "$user_info" },
+// Step 3: Sort users by total spent in descending order
+{ $sort: { totalSpent: -1 } },
+// Step 4: Group into one output document — all users + top spender
+{
+$group: {
+_id: null,
+allUsers: { $push: { user: "$user_info.name", amountSpent: "$totalSpent" } },
+maxSpender: { $first: { user: "$user_info.name", amountSpent: "$totalSpent" } }
+}
+},
+// Step 5: Clean up the output
+{
+$project: {
+_id: 0,
+"All_Users_Spending": "$allUsers",
+"User_With_Max_Spending": "$maxSpender"
+}
+}
+])
+BookMyShow Case Study
+
+Design Database and write CRUD operations + 5 analytical queries.
+
+Collections used:
+movies
+theatres
+shows

@@ -98,4 +98,99 @@ words_list2 = sentence2.split()
 
 distance = word_edit_distance(words_list1, words_list2, len(words_list1), len(words_list2))
 
-print("Word-level Edit Distance:", distance)
+print("Word-level Edit Distance:", distance)# Step 1: Import necessary libraries
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+
+from statsmodels.tsa.arima.model import ARIMA
+
+df = pd.read_csv('Electric_Production.csv')
+
+# Convert DATE column 
+df['DATE'] = pd.to_datetime(df['DATE'], format='%d/%m/%Y')
+
+# Set DATE as index
+df.set_index('DATE', inplace=True)
+
+df.rename(columns={'IPG2211A2N': 'Production'}, inplace=True)
+
+# Step 3: Plot time series
+plt.figure(figsize=(8, 4))
+plt.plot(df['Production'], marker='o', label='Actual Production')
+plt.title('Electricity Production Data')
+plt.xlabel('Date')
+plt.ylabel('Production')
+plt.legend()
+plt.show()
+
+df['Time'] = np.arange(len(df))
+
+# Train-test split (last 3 values)
+train = df.iloc[:-3]
+test = df.iloc[-3:]
+
+# Linear Regression
+lr = LinearRegression()
+lr.fit(train[['Time']], train['Production'])
+pred_lr = lr.predict(test[['Time']])
+
+# Random Forest
+rf = RandomForestRegressor(n_estimators=100, random_state=0)
+rf.fit(train[['Time']], train['Production'])
+pred_rf = rf.predict(test[['Time']])
+
+# ARIMA
+arima_model = ARIMA(train['Production'], order=(4, 1, 2))
+arima_fit = arima_model.fit()
+pred_arima = arima_fit.forecast(steps=3)
+
+results = test.copy()
+results['LR_Pred'] = pred_lr
+results['RF_Pred'] = pred_rf
+results['ARIMA_Pred'] = pred_arima.values
+
+def evaluate(actual, predicted):
+    mae = mean_absolute_error(actual, predicted)
+    rmse = np.sqrt(mean_squared_error(actual, predicted))
+    return mae, rmse
+
+mae_lr, rmse_lr = evaluate(test['Production'], results['LR_Pred'])
+mae_rf, rmse_rf = evaluate(test['Production'], results['RF_Pred'])
+mae_arima, rmse_arima = evaluate(test['Production'], results['ARIMA_Pred'])
+
+comparison = pd.DataFrame({
+    'Model': ['Linear Regression', 'Random Forest', 'ARIMA'],
+    'MAE': [mae_lr, mae_rf, mae_arima],
+    'RMSE': [rmse_lr, rmse_rf, rmse_arima]
+})
+
+print("\nModel Performance Comparison:\n")
+print(comparison)
+
+plt.figure(figsize=(8, 4))
+plt.plot(df.index, df['Production'], label='Actual', marker='o')
+plt.plot(results.index, results['LR_Pred'], label='Linear Regression', marker='x')
+plt.plot(results.index, results['RF_Pred'], label='Random Forest', marker='^')
+plt.plot(results.index, results['ARIMA_Pred'], label='ARIMA', marker='s')
+
+plt.title('Model Comparison')
+plt.xlabel('Date')
+plt.ylabel('Production')
+plt.legend()
+plt.show()
+
+print("\nDetailed Predictions:\n")
+print(results)
+
+# Machine learning models like Random Forest fail because they do not inherently capture time dependencies unless lag features are added.
+# ARIMA performs better as it models temporal relationships in time series data
+
+
+# Based on the visual and numerical comparison, ARIMA gives the best performance for time series forecasting. 
+# It accurately captures both the trend and time-based pattern of sales. Linear Regression performs moderately well by fitting a trend line, while Random Forest performs the weakest as it doesn’t consider time dependency. 
+# Hence, ARIMA is the most suitable model for predicting future sales in this dataset.

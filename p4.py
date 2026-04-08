@@ -1,97 +1,79 @@
-# BIGRAM
-def generate_bigrams(text):
-    bigrams = []
-    for i in range(len(text) - 1):
-        bigrams.append(text[i:i+2])   # cleaner slicing
-    return bigrams
+
+from nltk.tokenize import sent_tokenize, word_tokenize, RegexpTokenizer, TweetTokenizer
+from nltk.stem import PorterStemmer, WordNetLemmatizer
+from nltk.corpus import wordnet
+import nltk
+
+nltk.download('punkt')
+nltk.download('wordnet')
+nltk.download('averaged_perceptron_tagger')
+
+text = input("Enter Text:\n")
+
+sentences = sent_tokenize(text)
+print("\nSentence Tokenization:")
+print(sentences)
+
+words = word_tokenize(text)
+print("\nWord Tokenization:")
+print(words)
+
+tokenizer = RegexpTokenizer(r'\w+')
+print("\nRegex Tokens:", tokenizer.tokenize(text))
+
+tweet_tokenizer = TweetTokenizer()
+print("\nTweet Tokenizer:", tweet_tokenizer.tokenize(text))
+
+stemmer = PorterStemmer()
+stemmed_words = [stemmer.stem(word) for word in words]
+print("\nStemming:")
+print(stemmed_words)
+
+lemmatizer = WordNetLemmatizer()
+lemmatized_words = [lemmatizer.lemmatize(word) for word in words]
+print("\nLemmatization:")
+print(lemmatized_words)
+
+def get_wordnet_pos(word):
+    tag = nltk.pos_tag([word])[0][1][0].upper()
+    tag_dict = {
+        "J": wordnet.ADJ,
+        "N": wordnet.NOUN,
+        "V": wordnet.VERB,
+        "R": wordnet.ADV
+    }
+    return tag_dict.get(tag, wordnet.NOUN)
+
+lemmatized_with_pos = [lemmatizer.lemmatize(word, get_wordnet_pos(word)) for word in words]
+print("\nLemmatization with POS tagging:")
+print(lemmatized_with_pos)
 
 
-def calculate_jaccard(set1, set2):
-    union = set1 | set2
-    intersection = set1 & set2
-    return union, intersection
 
+# Sentiment
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.feature_extraction.text import CountVectorizer
 
-# Input
-string1 = "hello"
-string2 = "yellow"
+documents = [
+    "This is a positive review.",
+    "Great product, highly recommend.",
+    "Terrible experience, very disappointed.",
+    "Not satisfied with the service.",
+    "Excellent quality and fast delivery."
+]
+labels = ["positive", "positive", "negative", "negative", "positive"]
+# Convert text to numerical features (word counts)
+vectorizer = CountVectorizer()
+X = vectorizer.fit_transform(documents)
 
-bigrams1 = generate_bigrams(string1)
-bigrams2 = generate_bigrams(string2)
+# Create and train the MultinomialNB model
+model = MultinomialNB()
+model.fit(X, labels)
 
-print("Bigrams of string1:", bigrams1)
-print("Bigrams of string2:", bigrams2)
+new_document = ["This product is amazing!", 
+                "I am very disappointed with this movie."]
 
-union, intersection = calculate_jaccard(set(bigrams1), set(bigrams2))
+new_X = vectorizer.transform(new_document)
+prediction = model.predict(new_X)
 
-print("Union:", union)
-print("Intersection:", intersection)
-
-similarity = len(intersection) / len(union)
-print(f"Bigram Jaccard Similarity: {similarity:.3f}")
-
-print("-"*80)
-
-# 2) TRIGRAM
-def generate_trigrams(text):
-    trigrams = []
-    for i in range(len(text) - 2):
-        trigrams.append(text[i:i+3])
-    return trigrams
-
-
-# Input
-string1 = "hello"
-string2 = "yellow"
-
-trigrams1 = generate_trigrams(string1)
-trigrams2 = generate_trigrams(string2)
-
-print("Trigrams of string1:", trigrams1)
-print("Trigrams of string2:", trigrams2)
-
-union = set(trigrams1) | set(trigrams2)
-intersection = set(trigrams1) & set(trigrams2)
-
-print("Union:", union)
-print("Intersection:", intersection)
-
-similarity = len(intersection) / len(union)
-print(f"Trigram Jaccard Similarity: {similarity:.3f}")
-
-print("-"*80)
-# Jaccard Coefficent for n-grams
-def generate_ngrams(text, n):
-    if not isinstance(text, str) or len(text) < n:
-        return []
-    return [text[i:i+n] for i in range(len(text) - n + 1)]
-
-
-def jaccard_similarity(text1, text2, n):
-    ngrams1 = generate_ngrams(text1.lower(), n)
-    ngrams2 = generate_ngrams(text2.lower(), n)
-
-    set1 = set(ngrams1)
-    set2 = set(ngrams2)
-
-    intersection = set1 & set2
-    union = set1 | set2
-
-    print(f"{n}-grams of text1:", ngrams1)
-    print(f"{n}-grams of text2:", ngrams2)
-    print("Intersection:", intersection)
-    print("Union:", union)
-
-    if len(union) == 0:
-        return 0.0
-
-    return len(intersection) / len(union)
-
-
-# Example
-string1 = "hello"
-string2 = "yellow"
-n = 3
-
-similarity_score = jaccard_similarity(string1, string2, n)
-print(f"Jaccard Similarity ({n}-gram): {similarity_score:.3f}")
+print(f"The new document is classified as: {prediction}")

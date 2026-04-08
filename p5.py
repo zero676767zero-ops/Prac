@@ -1,58 +1,77 @@
-def compute_pagerank(graph, damping_factor=0.85, iterations=3):
-    # Get all pages (nodes)
-    pages = list(graph.keys())
-    total_pages = len(pages)
+import pandas as pd
+import numpy as np
+import pickle
+from sklearn.model_selection import train_test_split
+from tensorflow.keras.preprocessing.text import Tokenizer
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.models import Sequential, load_model
+from tensorflow.keras.layers import Embedding, Dense, LSTM
 
-    # Initialize PageRank (equal probability)
-    page_rank = {page: 1 / total_pages for page in pages}
-    print("Initial PageRank:", page_rank)
+df = pd.read_csv('Reviews.csv')
+df = df[['Text', 'Score']].dropna()
 
-    # Iterate to update PageRank
-    for iteration in range(1, iterations + 1):
-        new_page_rank = {page: 0 for page in pages}
+def label_sentiment(score):
+    if score >= 4:
+        return 'Positive'
+    elif score == 3:
+        return 'Neutral'
+    else:
+        return 'Negative'
 
-        # Distribute rank scores
-        for page in pages:
-            outgoing_links = graph[page]
+df['Sentiment'] = df['Score'].apply(label_sentiment)
 
-            # If page has outgoing links
-            if len(outgoing_links) > 0:
-                share = page_rank[page] / len(outgoing_links)
-                for linked_page in outgoing_links:
-                    new_page_rank[linked_page] += share
-            else:
-                # Handle dangling node (no outgoing links)
-                share = page_rank[page] / total_pages
-                for p in pages:
-                    new_page_rank[p] += share
+df_sample = df.sample(n=10000, random_state=42)
 
-        # Apply damping factor
-        for page in pages:
-            new_page_rank[page] = (
-                (1 - damping_factor) / total_pages +
-                damping_factor * new_page_rank[page]
-            )
+texts = df_sample['Text'].values
+labels = df_sample['Sentiment'].values
 
-        page_rank = new_page_rank
+label_dict = {'Negative': 0, 'Neutral': 1, 'Positive': 2}
+labels_encoded = np.array([label_dict[label] for label in labels])
 
-        print(f"\nAfter iteration {iteration}:")
-        for page in sorted(page_rank):
-            print(f"{page}: {page_rank[page]:.4f}")
+tokenizer = Tokenizer(num_words=5000)
+tokenizer.fit_on_texts(texts)
+sequences = tokenizer.texts_to_sequences(texts)
 
-    return page_rank
+max_len = 100
+padded_sequences = pad_sequences(sequences, maxlen=max_len)
 
+X_train, X_test, y_train, y_test = train_test_split(
+    padded_sequences, labels_encoded, test_size=0.2, random_state=42
+)
 
-# Example graph
-web_graph = {
-    'A': ['B', 'C'],
-    'B': ['C'],
-    'C': ['A'],
-    'D': ['C']
-}
+model = Sequential()
+model.add(Embedding(5000, 100, input_length=max_len))
+model.add(LSTM(128))
+model.add(Dense(3, activation='softmax'))
 
-# Run PageRank
-final_ranks = compute_pagerank(web_graph, damping_factor=0.85, iterations=3)
+model.compile(loss='sparse_categorical_crossentropy',
+              optimizer='adam',
+              metrics=['accuracy'])
 
-print("\nFinal PageRank:")
-for page in sorted(final_ranks):
-    print(f"{page}: {final_ranks[page]:.4f}")
+model.fit(X_train, y_train, epochs=2, batch_size=32,
+          validation_data=(X_test, y_test))
+
+model.save('sentiment_model.h5')
+
+with open('tokenizer.pkl', 'wb') as f:
+    pickle.dump(tokenizer, f)
+
+model = load_model('sentiment_model.h5')
+
+with open('tokenizer.pkl', 'rb') as f:
+    tokenizer = pickle.load(f)
+
+def predict_sentiment(text):
+    seq = tokenizer.texts_to_sequences([text])
+    padded = pad_sequences(seq, maxlen=max_len)
+    pred = model.predict(padded, verbose=0)
+    return ['Negative', 'Neutral', 'Positive'][pred.argmax()]
+
+examples = [
+    "This product is amazing!",
+    "It's okay",
+    "Worst product ever"
+]
+
+for text in examples:
+    print(text, "->", predict_sentiment(text))
